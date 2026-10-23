@@ -1,0 +1,230 @@
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#10121c">
+<title>SORT RUSH</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+:root{--bg:#10121c;--panel:#1b1e2d;--text:#f5f6ff;--muted:#999fb8;--accent:#a6ff66}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,sans-serif;min-height:100vh}
+button{font:inherit;cursor:pointer;touch-action:manipulation}
+.app{max-width:480px;margin:auto;padding:22px 18px 32px}
+header{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px}
+.logo{font-size:22px;font-weight:1000;letter-spacing:1px}
+.logo span{color:var(--accent)}
+.pill{background:var(--panel);border:1px solid #303449;border-radius:20px;padding:8px 12px;font-size:12px;color:var(--muted)}
+h1{font-size:30px;line-height:1.1;margin:8px 0}
+.sub{color:var(--muted);font-size:14px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin:22px 0}
+.stat{background:var(--panel);border:1px solid #2b2f43;border-radius:15px;padding:13px 8px;text-align:center}
+.stat small{display:block;color:var(--muted);font-size:11px;margin-bottom:5px}
+.stat strong{font-size:23px;font-variant-numeric:tabular-nums}
+#time{color:var(--accent)}
+.progress{height:5px;background:#2b2f43;border-radius:8px;overflow:hidden;margin-bottom:22px}
+#bar{height:100%;width:100%;background:var(--accent);transition:width .2s}
+.board{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;align-items:end;margin:20px 0}
+.tube{height:156px;min-width:0;border:2px solid #555b77;border-top:0;border-radius:0 0 18px 18px;background:#1a1d2a;display:flex;flex-direction:column-reverse;align-items:center;justify-content:flex-start;padding:7px 3px 8px;gap:5px;position:relative;transition:.15s}
+.tube:before{content:"";position:absolute;top:0;left:-2px;right:-2px;height:5px;border-radius:5px;background:#555b77}
+.tube.selected{border-color:var(--accent);background:#252d2c;transform:translateY(-5px)}
+.ball{width:min(42px,10vw);height:min(42px,10vw);max-height:37px;border-radius:50%;box-shadow:inset -5px -6px 9px #0003,inset 3px 3px 6px #ffffff55,0 3px 5px #0003;flex-shrink:0}
+.red{background:#ff5c72}.blue{background:#4da8ff}.green{background:#a6ff66}.yellow{background:#ffd45b}
+.hint{text-align:center;color:var(--muted);font-size:13px;margin:10px 0 20px}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.btn{border:0;border-radius:14px;padding:15px 10px;font-weight:800}
+.primary{background:var(--accent);color:#15191a}
+.secondary{background:var(--panel);color:var(--text);border:1px solid #34394e}
+button:disabled{opacity:.45;cursor:not-allowed}
+.note{text-align:center;color:var(--muted);font-size:11px;margin-top:20px}
+.overlay{position:fixed;inset:0;background:#090b12eF;display:flex;align-items:center;justify-content:center;padding:22px;z-index:5}
+.modal{width:100%;max-width:380px;background:var(--panel);border:1px solid #353a50;border-radius:24px;padding:28px 22px;text-align:center}
+.modal .emoji{font-size:45px}
+.modal h2{font-size:29px;margin:12px 0 4px}
+.modal p{color:var(--muted);line-height:1.5}
+.modal .btn{width:100%;margin-top:10px}
+.hidden{display:none!important}
+</style>
+</head>
+<body>
+<main class="app">
+<header>
+  <div class="logo">SORT <span>RUSH</span></div>
+  <div class="pill">🧩 PUZZLE RUSH</div>
+</header>
+
+<section>
+  <h1>Ordena. Combina.<br>¡Domina el reto!</h1>
+  <div class="sub">Agrupa las bolas del mismo color en cada tubo.</div>
+</section>
+
+<section class="stats">
+  <div class="stat"><small>⏱ TIEMPO</small><strong id="time">60</strong></div>
+  <div class="stat"><small>⚡ PUNTOS</small><strong id="score">0</strong></div>
+  <div class="stat"><small>🔥 COMBO</small><strong id="combo">x0</strong></div>
+</section>
+<div class="progress"><div id="bar"></div></div>
+
+<div id="board" class="board" aria-label="Tablero del juego"></div>
+<div class="hint" id="hint" aria-live="polite">Toca un tubo y después el destino.</div>
+
+<div class="actions">
+  <button class="btn primary" id="restart">↻ Reiniciar</button>
+  <button class="btn secondary" id="share">↗ Retar a un amigo</button>
+</div>
+<div class="note">Cada movimiento cuenta. ¿Puedes resolverlo antes de que acabe el tiempo?</div>
+</main>
+
+<div class="overlay" id="intro">
+  <div class="modal">
+    <div class="emoji">🧪</div>
+    <h2>SORT RUSH</h2>
+    <p>Tienes 60 segundos para ordenar las bolas. Mueve una bola superior a un tubo vacío o a uno cuyo color coincida. Cada tubo admite 3 bolas.</p>
+    <button class="btn primary" id="start">¡JUGAR AHORA!</button>
+  </div>
+</div>
+
+<div class="overlay hidden" id="result">
+  <div class="modal">
+    <div class="emoji" id="resultEmoji">🏆</div>
+    <h2 id="resultTitle">¡Partida terminada!</h2>
+    <p id="resultText"></p>
+    <button class="btn primary" id="again">JUGAR OTRA VEZ</button>
+    <button class="btn secondary" id="shareResult">COMPARTIR RESULTADO</button>
+  </div>
+</div>
+
+<script>
+(function(){
+const tg=window.Telegram?.WebApp;
+if(tg){tg.ready();tg.expand();}
+
+const $=id=>document.getElementById(id);
+const colors=["red","blue","green","yellow"];
+let tubes=[],selected=-1,score=0,combo=0,time=60,timer=null;
+let playing=false,moves=0,best=Number(localStorage.getItem("sortrush_best")||0);
+
+function shuffleBoard(){
+  tubes=[["red","red","red"],["blue","blue","blue"],["green","green","green"],[]];
+  let previous=null;
+  for(let n=0;n<30;n++){
+    let options=[];
+    tubes.forEach((tube,i)=>{
+      if(!tube.length)return;
+      const color=tube[tube.length-1];
+      tubes.forEach((dest,j)=>{
+        if(i===j||dest.length>=3)return;
+        if(dest.length&&dest[dest.length-1]!==color)return;
+        if(previous&&previous[0]===j&&previous[1]===i)return;
+        options.push([i,j]);
+      });
+    });
+    if(!options.length)break;
+    const move=options[Math.floor(Math.random()*options.length)];
+    tubes[move[1]].push(tubes[move[0]].pop());
+    previous=move;
+  }
+  if(tubes.some(t=>t.length===3&&t.every(c=>c===t[0])))return shuffleBoard();
+}
+
+function render(){
+  $("board").innerHTML="";
+  tubes.forEach((tube,i)=>{
+    const el=document.createElement("button");
+    el.className="tube"+(selected===i?" selected":"");
+    el.setAttribute("aria-label","Tubo "+(i+1)+", "+tube.length+" bolas");
+    el.setAttribute("aria-pressed",String(selected===i));
+    tube.forEach(color=>{
+      const ball=document.createElement("span");
+      ball.className="ball "+color;
+      el.appendChild(ball);
+    });
+    el.addEventListener("click",()=>tapTube(i));
+    $("board").appendChild(el);
+  });
+  $("score").textContent=score.toLocaleString("es");
+  $("combo").textContent="x"+combo;
+  $("time").textContent=time;
+  $("bar").style.width=(time/60*100)+"%";
+}
+
+function tapTube(i){
+  if(!playing)return;
+  if(selected===-1){
+    if(tubes[i].length){selected=i;$("hint").textContent="Ahora elige el tubo de destino.";}
+    else $("hint").textContent="Elige un tubo que tenga bolas.";
+  }else if(selected===i){
+    selected=-1;$("hint").textContent="Selección cancelada.";
+  }else{
+    const from=tubes[selected],to=tubes[i],color=from[from.length-1];
+    if(from.length&&to.length<3&&(!to.length||to[to.length-1]===color)){
+      to.push(from.pop());moves++;combo++;
+      score+=100+Math.min(combo-1,10)*25;
+      $("hint").textContent=combo>1?"🔥 ¡Combo x"+combo+"!":"¡Buen movimiento!";
+      selected=-1;render();
+      if(isWon()){finish(true);return;}
+    }else{
+      combo=0;
+      $("hint").textContent="Movimiento no válido. Elige un tubo vacío o del mismo color.";
+      selected=-1;
+    }
+  }
+  render();
+}
+
+function isWon(){
+  return tubes.every(t=>!t.length||(t.length===3&&t.every(c=>c===t[0])));
+}
+
+function finish(won){
+  playing=false;clearInterval(timer);timer=null;
+  if(won){
+    score+=time*20;
+    if(score>best){best=score;localStorage.setItem("sortrush_best",String(best));}
+  }
+  render();
+  $("resultEmoji").textContent=won?"🏆":"⏱️";
+  $("resultTitle").textContent=won?"¡Puzzle resuelto!":"¡Se acabó el tiempo!";
+  $("resultText").textContent=(won?"¡Completaste todos los tubos!":"Vuelve a intentarlo y mejora tu marca.")+
+    "\n\nPuntuación: "+score.toLocaleString("es")+"\nRécord personal: "+best.toLocaleString("es")+"\nMovimientos: "+moves;
+  $("result").classList.remove("hidden");
+}
+
+function start(){
+  clearInterval(timer);shuffleBoard();
+  selected=-1;score=0;combo=0;time=60;moves=0;playing=true;
+  $("intro").classList.add("hidden");$("result").classList.add("hidden");
+  $("hint").textContent="Toca un tubo y después el destino.";
+  render();
+  timer=setInterval(()=>{
+    if(!playing)return;
+    time--;
+    render();
+    if(time<=0)finish(false);
+  },1000);
+}
+
+async function share(){
+  const text="🧪 Estoy jugando SORT RUSH. Mi récord es "+best+" puntos. ¿Puedes superarlo?";
+  const url=location.href;
+  if(tg?.openTelegramLink){
+    tg.openTelegramLink("https://t.me/share/url?url="+encodeURIComponent(url)+"&text="+encodeURIComponent(text));
+  }else if(navigator.share){
+    try{await navigator.share({title:"SORT RUSH",text,url});}catch(e){}
+  }else{
+    $("hint").textContent="Copia y comparte el enlace del juego: "+url;
+  }
+}
+
+$("start").addEventListener("click",start);
+$("restart").addEventListener("click",()=>{if(playing){if(confirm("¿Reiniciar la partida?"))start();}else start();});
+$("again").addEventListener("click",start);
+$("share").addEventListener("click",share);
+$("shareResult").addEventListener("click",share);
+render();
+})();
+</script>
+</body>
+</html>
